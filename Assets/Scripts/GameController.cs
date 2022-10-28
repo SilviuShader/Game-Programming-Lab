@@ -4,13 +4,13 @@ using UnityEngine;
 public class GameController : MonoBehaviour
 {
     [SerializeField]
-    private        Pickup       _pickupPrefab       = default;
-    [SerializeField]                                
-    private        BoxCollider  _floor              = default;
-    [SerializeField]                                
-    private        float        _pickupRadius       = 0.5f;
+    private        Pickup       _pickupPrefab                = default;
+    [SerializeField]                                         
+    private        BoxCollider  _floor                       = default;
+    [SerializeField]                                         
+    private        float        _pickupRadius                = 0.5f;
 
-    private static List<Pickup> InstantiatedPickups = new();
+    private static List<Pickup> InstantiatedPickups { get; } = new();
 
     public static void RegisterPickup(Pickup pickup)
     {
