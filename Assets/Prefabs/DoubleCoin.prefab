@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 7745154849108988690}
   - component: {fileID: 8484878635569438324}
   m_Layer: 0
-  m_Name: Coin
+  m_Name: DoubleCoin
   m_TagString: Pickup
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -63,7 +63,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 8fa4148cd4f6be542944cdc5cc418dfb, type: 2}
+  - {fileID: 2100000, guid: 3021e50b5b311d04f918333d49d615be, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -111,3 +111,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _rotationSpeed: 100
+  _increment: 2

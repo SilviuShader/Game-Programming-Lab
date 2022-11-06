@@ -1,16 +1,58 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
+
+using Random = UnityEngine.Random;
 
 public class GameController : MonoBehaviour
 {
-    [SerializeField]
-    private        Pickup       _pickupPrefab                = default;
-    [SerializeField]                                         
-    private        BoxCollider  _floor                       = default;
-    [SerializeField]                                         
-    private        float        _pickupRadius                = 0.5f;
+    [Serializable]
+    public struct PickupProperties
+    {
+        public Pickup Prefab;
+        public float  Chance;
+    }
 
-    private static List<Pickup> InstantiatedPickups { get; } = new();
+    public static  GameController     Instance            { get; private set; }
+    public         int                Score
+    {
+        get => _score;
+        set
+        {
+            _score = value;
+            Debug.Log("Score: " + _score);
+        }
+    }
+
+    public         bool               InvertControls
+    {
+        get => _invertControls;
+        set
+        {
+            _invertControls = value;
+
+            if (_invertControlsCoroutine != null)
+                StopCoroutine(_invertControlsCoroutine);
+
+            _invertControlsCoroutine = StartCoroutine(ResetInvertControls());
+        }
+    }
+
+    [SerializeField]
+    private        PickupProperties[] _pickupsProperties;
+    [SerializeField]                                           
+    private        BoxCollider        _floor                       = default;
+    [SerializeField]                                               
+    private        float              _pickupRadius                = 0.5f;
+    [SerializeField]                  
+    private        float              _invertDuration              = 5.0f;
+                                      
+    private        int                _score;
+    private        bool               _invertControls;
+    private        Coroutine          _invertControlsCoroutine;
+    private static List<Pickup>       InstantiatedPickups { get; } = new();
 
     public static void RegisterPickup(Pickup pickup)
     {
@@ -29,10 +71,16 @@ public class GameController : MonoBehaviour
         InstantiatedPickups.Remove(pickup);
     }
 
+    private void OnEnable() =>
+        Instance = this;
+
+    private void OnDisable() =>
+        Instance = null;
+
     private void Update()
     {
         if (InstantiatedPickups.Count < 1)
-            SpawnPickup(_pickupPrefab);
+            SpawnPickup(RouletteWheelSelection());
     }
 
     private void SpawnPickup(Pickup prefab)
@@ -49,5 +97,31 @@ public class GameController : MonoBehaviour
         );
 
         pickup.transform.position = position;
+    }
+
+    private IEnumerator ResetInvertControls()
+    {
+        yield return new WaitForSeconds(_invertDuration);
+        _invertControlsCoroutine = null;
+        _invertControls = false;
+    }
+
+    private Pickup RouletteWheelSelection()
+    {
+        var sum = _pickupsProperties
+            .Select(x => x.Chance)
+            .Sum();
+
+        var point = Random.value * sum;
+        var accumulator = 0.0f;
+
+        foreach (var pickupProperty in _pickupsProperties)
+        {
+            accumulator += pickupProperty.Chance;
+            if (accumulator >= point)
+                return pickupProperty.Prefab;
+        }
+
+        return _pickupsProperties.First().Prefab;
     }
 }

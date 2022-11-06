@@ -20,9 +20,9 @@ public class MovingSphere : MonoBehaviour
     private void Awake() => 
         _rigidbody = GetComponent<Rigidbody>();
 
-    private void OnCollisionEnter(Collision collision)
+    private void OnTriggerEnter(Collider collider)
     {
-        var other = collision.gameObject;
+        var other = collider.gameObject;
      
         if (other.CompareTag("Pickup"))
         {
@@ -32,9 +32,12 @@ public class MovingSphere : MonoBehaviour
         }
     }
 
-    private void Update() =>
-        _desiredVelocity = new Vector3(_movement.x, 0.0f, _movement.y) * 
-                           _maxSpeed;
+    private void Update()
+    {
+        var sign = GameController.Instance.InvertControls ? -1.0f : 1.0f;
+        _desiredVelocity = new Vector3(_movement.x, 0.0f, _movement.y) *
+                           sign * _maxSpeed;
+    }
 
     private void FixedUpdate()
     {
