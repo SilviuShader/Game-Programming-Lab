@@ -64,6 +64,16 @@ public class MovingSphere : MonoBehaviour
 
     private void Update()
     {
+        if (!GameController.Instance.GameRunning)
+        {
+            _movement = Vector2.zero;
+            if (_movementCoroutine != null)
+            {
+                StopCoroutine(_movementCoroutine);
+                _movementCoroutine = null;
+            }
+        }
+
         var sign = GameController.Instance.InvertControls ? -1.0f : 1.0f;
         _desiredVelocity = new Vector3(_movement.x, 0.0f, _movement.y) *
                            sign * _maxSpeed;
