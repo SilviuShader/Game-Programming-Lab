@@ -2,8 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 using Random = UnityEngine.Random;
@@ -15,6 +17,16 @@ public class GameController : MonoBehaviour
     {
         public Pickup Prefab;
         public float  Chance;
+    }
+
+    [Serializable]
+    public struct GameSceneState
+    {
+        public Vector3       PlayerPosition;
+        public int           Score;
+        public float         RemainingTime;
+        public List<int>     PickupTypes;
+        public List<Vector3> PickupsPositions;
     }
 
     public static  GameController     Instance    { get; private set; }
@@ -43,6 +55,7 @@ public class GameController : MonoBehaviour
     }
 
     public         bool               GameRunning { get; private set; } = true;
+    public         string             SceneSaveFilePath => Application.persistentDataPath + "/SceneState.json";
 
     [SerializeField]
     private        PickupProperties[] _pickupsProperties;
@@ -55,20 +68,79 @@ public class GameController : MonoBehaviour
     [SerializeField]                                                    
     private        float              _gameplayTime                     = 15.0f;
     [SerializeField]
+    private        MovingSphere       _player;
+    [SerializeField]
     private        TMP_Text           _scoreText;
     [SerializeField]
     private        TMP_Text           _remainingTimeText;
     [SerializeField]
     private        TMP_Text           _finalScoreText;
     [SerializeField]
+    private        TMP_Text           _maxScoreText;
+    [SerializeField]
     private        Canvas             _gameCanvas;
     [SerializeField]
     private        Canvas             _endingCanvas;
 
     private        int                _score;
+    private        int                _maxScore;
     private        bool               _invertControls;
     private        Coroutine          _invertControlsCoroutine;
     private static List<Pickup>       InstantiatedPickups { get; }      = new();
+    private static bool               _resetSceneState;
+
+    public void SaveScenePressed(InputAction.CallbackContext context)
+    {
+        if (!context.started)
+            return;
+
+        var sceneState = new GameSceneState
+        {
+            PlayerPosition = _player.transform.position,
+            Score = Score,
+            RemainingTime = _gameplayTime,
+            PickupTypes = new List<int>(),
+            PickupsPositions = new List<Vector3>()
+        };
+
+        foreach (var pickup in InstantiatedPickups)
+        {
+            var pickupType = 0;
+            switch (pickup)
+            {
+                case Coin current:
+                    for (var i = 0; i < _pickupsProperties.Length; i++)
+                        if (_pickupsProperties[i].Prefab is Coin prefabC)
+                            if (prefabC.Increment == current.Increment)
+                                pickupType = i;
+                    break;
+                case InversePickup:
+                    pickupType = 
+                        _pickupsProperties.TakeWhile(t => t.Prefab is not InversePickup)
+                            .Count();
+                    break;
+            }
+
+            sceneState.PickupTypes.Add(pickupType);
+            sceneState.PickupsPositions.Add(pickup.transform.position);
+        }
+
+        var json = JsonUtility.ToJson(sceneState);
+
+        File.WriteAllText(SceneSaveFilePath, json);
+    }
+
+    public void LoadScenePressed(InputAction.CallbackContext context)
+    {
+        if (!context.started)
+            return;
+
+        if (!File.Exists(SceneSaveFilePath))
+            return;
+
+        _resetSceneState = true;
+        OnReplayButtonPressed();
+    }
 
     public void OnReplayButtonPressed() =>
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -93,6 +165,30 @@ public class GameController : MonoBehaviour
         InstantiatedPickups.Remove(pickup);
     }
 
+    private void Awake()
+    {
+        if (_resetSceneState)
+        {
+            var json = File.ReadAllText(SceneSaveFilePath);
+            var savedData = JsonUtility.FromJson<GameSceneState>(json);
+
+            _player.transform.position = savedData.PlayerPosition;
+            Score = savedData.Score;
+            _gameplayTime = savedData.RemainingTime;
+            var index = 0;
+            foreach (var pickupType in savedData.PickupTypes)
+            {
+                var position = savedData.PickupsPositions[index];
+                SpawnPickup(_pickupsProperties[pickupType].Prefab, position);
+                index++;
+            }
+
+            _resetSceneState = true;
+        }
+
+        _maxScore = PlayerPrefs.GetInt("MaxScore", 0);
+    }
+
     private void OnEnable() =>
         Instance = this;
 
@@ -110,7 +206,11 @@ public class GameController : MonoBehaviour
             {
                 _gameCanvas.gameObject.SetActive(false);
                 _endingCanvas.gameObject.SetActive(true);
+                if (_score > _maxScore)
+                    _maxScore = _score;
+                PlayerPrefs.SetInt("MaxScore", _maxScore);
                 _finalScoreText.text = "Score: " + _score;
+                _maxScoreText.text = "Max Score: " + _maxScore;
                 GameRunning = false;
             }
         }
@@ -124,7 +224,7 @@ public class GameController : MonoBehaviour
             SpawnPickup(RouletteWheelSelection());
     }
 
-    private void SpawnPickup(Pickup prefab)
+    private void SpawnPickup(Pickup prefab, Vector3? desiredPosition = null)
     {
         var pickup = Instantiate(prefab);
         var bounds = _floor.bounds;
@@ -136,6 +236,9 @@ public class GameController : MonoBehaviour
             bounds.max.y + _pickupRadius,
             Mathf.Lerp(bounds.min.z, bounds.max.z, Random.value)
         );
+
+        if (desiredPosition.HasValue)
+            position = desiredPosition.Value;
 
         pickup.transform.position = position;
     }
